@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>График смен</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+        }
+        .day-cell {
+            min-height: 100px;
+        }
+        .modal {
+            transition: opacity 0.3s ease;
+        }
+        .date-range-fields {
+            display: none;
+        }
+        .request-item {
+            transition: all 0.3s ease;
+        }
+        .request-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Заголовок -->
+        <div class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-800">График смен</h1>
+            <p class="text-gray-600 mt-2">Цех №3 - Мастер: Иванов Сергей Петрович</p>
+        </div>
+
+        <!-- Панель управления -->
+        <div class="flex justify-between items-center mb-6 bg-white rounded-lg shadow p-4">
+            <button id="prev-month" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition">
+                <i class="fas fa-chevron-left mr-2"></i>Предыдущий месяц
+            </button>
+            
+            <div class="flex space-x-4">
+                <h2 id="current-month" class="text-xl font-semibold text-gray-800">Июнь 2023</h2>
+                <button id="edit-shifts" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition">
+                    <i class="fas fa-edit mr-2"></i>Редактировать смены
+                </button>
+                <button id="requests-btn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition relative">
+                    <i class="fas fa-clipboard-list mr-2"></i>Заявки
+                    <span id="requests-badge" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center hidden">0</span>
+                </button>
+            </div>
+            
+            <button id="next-month" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition">
+                Следующий месяц<i class="fas fa-chevron-right ml-2"></i>
+            </button>
+        </div>
+
+        <!-- Календарь -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <!-- Заголовки дней недели -->
+            <div class="calendar-grid bg-gray-200 border-b">
+                <div class="p-3 text-center font-medium text-gray-700">Пн</div>
+                <div class="p-3 text-center font-medium text-gray-700">Вт</div>
+                <div class="p-3 text-center font-medium text-gray-700">Ср</div>
+                <div class="p-3 text-center font-medium text-gray-700">Чт</div>
+                <div class="p-3 text-center font-medium text-gray-700">Пт</div>
+                <div class="p-3 text-center font-medium text-gray-700">Сб</div>
+                <div class="p-3 text-center font-medium text-gray-700">Вс</div>
+            </div>
+
+            <!-- Ячейки календаря -->
+            <div id="calendar" class="calendar-grid bg-gray-100">
+                <!-- Динамически заполняется JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно с деталями дня -->
+    <div id="day-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 modal hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="modal-date" class="text-xl font-bold text-gray-800">15 июня 2023</h3>
+                    <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- Работающие сотрудники -->
+                <div class="mb-6">
+                    <h4 class="text-lg font-semibold text-gray-700 mb-3">Работающие сотрудники</h4>
+                    <div id="working-employees" class="space-y-3">
+                        <!-- Динамически заполняется JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Отсутствующие сотрудники -->
+                <div>
+                    <h4 class="text-lg font-semibold text-gray-700 mb-3">Отсутствующие сотрудники</h4>
+                    <div id="absent-employees" class="space-y-3">
+                        <!-- Динамически заполняется JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования смен -->
+    <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 modal hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">Редактирование смен</h3>
+                    <button id="close-edit-modal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <form id="edit-shift-form" class="space-y-4">
+                    <!-- Выбор сотрудника -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Сотрудник</label>
+                        <select id="employee-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Выберите сотрудника</option>
+                            <!-- Динамически заполняется JavaScript -->
+                        </select>
+                    </div>
+
+                    <!-- Выбор типа смены/отсутствия -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Тип смены/отсутствия</label>
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <div class="flex items-center">
+                                <input type="radio" id="day-shift" name="shift-type" value="day" class="mr-2">
+                                <label for="day-shift" class="text-sm">Дневная смена</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="radio" id="night-shift" name="shift-type" value="night" class="mr-2">
+                                <label for="night-shift" class="text-sm">Ночная смена</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="radio" id="vacation" name="shift-type" value="vacation" class="mr-2">
+                                <label for="vacation" class="text-sm">Отпуск</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="radio" id="sick" name="shift-type" value="sick" class="mr-2">
+                                <label for="sick" class="text-sm">Больничный</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="radio" id="dayoff" name="shift-type" value="dayoff" class="mr-2">
+                                <label for="dayoff" class="text-sm">Выходной</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="radio" id="absent" name="shift-type" value="absent" class="mr-2">
+                                <label for="absent" class="text-sm">Прогул</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Поля для выбора даты/интервала -->
+                    <div id="single-date-field">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Дата</label>
+                        <input type="date" id="shift-date" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <div id="date-range-fields" class="date-range-fields">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Период отсутствия</label>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Начало</label>
+                                <input type="date" id="start-date" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Окончание</label>
+                                <input type="date" id="end-date" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Время работы (только для смен) -->
+                    <div id="time-fields" class="hidden">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Начало смены</label>
+                                <input type="time" id="shift-start" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value="08:00">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Конец смены</label>
+                                <input type="time" id="shift-end" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value="20:00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Кнопки -->
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" id="cancel-edit" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">Отмена</button>
+                        <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно заявок -->
+    <div id="requests-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 modal hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">Заявки сотрудников</h3>
+                    <button id="close-requests-modal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <div id="requests-list" class="space-y-4">
+                    <!-- Заявки будут добавляться динамически -->
+                </div>
+
+                <div id="no-requests" class="text-center py-8 text-gray-500 hidden">
+                    <i class="fas fa-inbox text-4xl mb-4"></i>
+                    <p>Нет активных заявок</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Текущая дата
+        let currentDate = new Date();
+        
+        // База данных сотрудников
+        const employees = [
+            { id: 1, name: "Петров Алексей" },
+            { id: 2, name: "Сидорова Мария" },
+            { id: 3, name: "Козлов Дмитрий" },
+            { id: 4, name: "Николаев Иван" },
+            { id: 5, name: "Васильев Олег" },
+            { id: 6, name: "Семенова Анна" },
+            { id: 7, name: "Григорьев Павел" },
+            { id: 8, name: "Федорова Елена" },
+            { id: 9, name: "Морозов Андрей" },
+            { id: 10, name: "Орлова Ирина" }
+        ];
+
+        // База данных смен
+        let shiftsData = JSON.parse(localStorage.getItem('shiftsData')) || {};
+
+        // База данных заявок
+        let requestsData = JSON.parse(localStorage.getItem('shiftRequests')) || [];
+
+        // Функция для отображения календаря
+        function renderCalendar(date) {
+            const calendarElement = document.getElementById('calendar');
+            calendarElement.innerHTML = '';
+            
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            
+            // Обновляем заголовок месяца
+            document.getElementById('current-month').textContent = 
+                date.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
+            
+            // Получаем первый день месяца и количество дней
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            
+            // Определяем день недели первого дня месяца (0 - воскресенье, 1 - понедельник и т.д.)
+            let firstDayOfWeek = firstDay.getDay();
+            // Корректируем для отображения понедельника как первого дня недели
+            firstDayOfWeek = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+            
+            // Добавляем пустые ячейки до первого дня месяца
+            for (let i = 0; i < firstDayOfWeek; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'day-cell bg-gray-100 p-2';
+                calendarElement.appendChild(emptyCell);
+            }
+            
+            // Добавляем ячейки с днями месяца
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.className = 'day-cell bg-white p-2 border border-gray-200 cursor-pointer hover:bg-blue-50 transition';
+                
+                const dateKey = `${year}-${String(month+1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayShifts = shiftsData[dateKey] || [];
+                
+                // Фильтруем работающих сотрудников
+                const workingEmployees = dayShifts.filter(shift => 
+                    shift.type === 'day' || shift.type === 'night'
+                );
+                
+                // Фильтруем отсутствующих сотрудников
+                const absentEmployees = dayShifts.filter(shift => 
+                    shift.type === 'vacation' || shift.type === 'sick' || 
+                    shift.type === 'dayoff' || shift.type === 'absent'
+                );
+                
+                // Отображаем до 2 работающих сотрудников в ячейке
+                let employeesHTML = '';
+                if (workingEmployees.length > 0) {
+                    employeesHTML = workingEmployees.slice(0, 2).map(shift => {
+                        const employee = employees.find(emp => emp.id === shift.employeeId);
+                        const shiftType = shift.type === 'day' ? 'Д' : 'Н';
+                        return `<div class="truncate">${employee ? employee.name.split(' ')[0] : 'Неизв.'} (${shiftType})</div>`;
+                    }).join('');
+                    
+                    if (workingEmployees.length > 2) {
+                        employeesHTML += `<div class="text-xs text-gray-500">+${workingEmployees.length - 2} еще</div>`;
+                    }
+                } else {
+                    employeesHTML = '<div class="text-xs text-gray-500">Нет смен</div>';
+                }
+                
+                // Подсвечиваем дни с отсутствующими сотрудниками
+                let dayStyle = '';
+                if (absentEmployees.length > 0) {
+                    if (absentEmployees.some(shift => shift.type === 'vacation')) {
+                        dayStyle = 'border-l-4 border-l-green-500';
+                    } else if (absentEmployees.some(shift => shift.type === 'sick')) {
+                        dayStyle = 'border-l-4 border-l-orange-500';
+                    } else if (absentEmployees.some(shift => shift.type === 'absent')) {
+                        dayStyle = 'border-l-4 border-l-red-500';
+                    }
+                }
+                
+                dayCell.innerHTML = `
+                    <div class="flex justify-between items-start ${dayStyle}">
+                        <span class="text-lg font-medium">${day}</span>
+                        <div class="flex flex-col items-end">
+                            ${workingEmployees.length > 0 ? 
+                                `<span class="text-xs bg-blue-100 text-blue-800 px-1 rounded mb-1">${workingEmployees.length} смен</span>` : 
+                                ''}
+                            ${absentEmployees.length > 0 ? 
+                                `<span class="text-xs bg-red-100 text-red-800 px-1 rounded">${absentEmployees.length} отсу.</span>` : 
+                                ''}
+                        </div>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500">
+                        ${employeesHTML}
+                    </div>
+                `;
+                
+                // Добавляем обработчик клика
+                dayCell.addEventListener('click', () => openDayModal(day, month, year));
+                
+                calendarElement.appendChild(dayCell);
+            }
+        }
+        
+        // Функция для открытия модального окна с деталями дня
+        function openDayModal(day, month, year) {
+            const modal = document.getElementById('day-modal');
+            const modalDate = document.getElementById('modal-date');
+            const workingEmployees = document.getElementById('working-employees');
+            const absentEmployees = document.getElementById('absent-employees');
+            
+            // Устанавливаем дату в заголовке модального окна
+            const date = new Date(year, month, day);
+            modalDate.textContent = date.toLocaleDateString('ru-RU', { 
+                day: 'numeric', 
+                month: 'long', 
+                year: 'numeric',
+                weekday: 'long'
+            });
+            
+            const dateKey = `${year}-${String(month+1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dayShifts = shiftsData[dateKey] || [];
+            
+            // Фильтруем работающих сотрудников
+            const workingShifts = dayShifts.filter(shift => 
+                shift.type === 'day' || shift.type === 'night'
+            );
+            
+            // Фильтруем отсутствующих сотрудников
+            const absentShifts = dayShifts.filter(shift => 
+                shift.type === 'vacation' || shift.type === 'sick' || 
+                shift.type === 'dayoff' || shift.type === 'absent'
+            );
+            
+            // Заполняем работающих сотрудников
+            workingEmployees.innerHTML = '';
+            if (workingShifts.length === 0) {
+                workingEmployees.innerHTML = '<p class="text-gray-500 text-center py-4">Нет работающих сотрудников</p>';
+            } else {
+                workingShifts.forEach(shift => {
+                    const employee = employees.find(emp => emp.id === shift.employeeId);
+                    if (!employee) return;
+                    
+                    const employeeElement = document.createElement('div');
+                    employeeElement.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
+                    
+                    let shiftInfo = '';
+                    if (shift.type === 'day') {
+                        shiftInfo = `День (${shift.startTime || '08:00'} - ${shift.endTime || '20:00'})`;
+                    } else if (shift.type === 'night') {
+                        shiftInfo = `Ночь (${shift.startTime || '20:00'} - ${shift.endTime || '08:00'})`;
+                    }
+                    
+                    employeeElement.innerHTML = `
+                        <div>
+                            <div class="font-medium">${employee.name}</div>
+                            <div class="text-sm text-gray-600">${shiftInfo}</div>
+                        </div>
+                        <span class="px-2 py-1 rounded text-xs font-medium ${shift.type === 'day' ? 'bg-yellow-100 text-yellow-800' : 'bg-indigo-100 text-indigo-800'}">
+                            ${shift.type === 'day' ? 'День' : 'Ночь'}
+                        </span>
+                    `;
+                    workingEmployees.appendChild(employeeElement);
+                });
+            }
+            
+            // Заполняем отсутствующих сотрудников
+            absentEmployees.innerHTML = '';
+            if (absentShifts.length === 0) {
+                absentEmployees.innerHTML = '<p class="text-gray-500 text-center py-4">Нет отсутствующих сотрудников</p>';
+            } else {
+                absentShifts.forEach(shift => {
+                    const employee = employees.find(emp => emp.id === shift.employeeId);
+                    if (!employee) return;
+                    
+                    const employeeElement = document.createElement('div');
+                    employeeElement.className = 'flex justify-between items-center p-3 bg-gray-50 rounded-lg';
+                    
+                    let reasonText = '';
+                    let reasonClass = '';
+                    
+                    switch(shift.type) {
+                        case 'vacation':
+                            reasonText = 'Отпуск';
+                            reasonClass = 'bg-green-100 text-green-800';
+                            break;
+                        case 'sick':
+                            reasonText = 'Больничный';
+                            reasonClass = 'bg-orange-100 text-orange-800';
+                            break;
+                        case 'dayoff':
+                            reasonText = 'Выходной';
+                            reasonClass = 'bg-blue-100 text-blue-800';
+                            break;
+                        case 'absent':
+                            reasonText = 'Прогул';
+                            reasonClass = 'bg-red-100 text-red-800';
+                            break;
+                    }
+                    
+                    employeeElement.innerHTML = `
+                        <div class="font-medium">${employee.name}</div>
+                        <span class="px-2 py-1 rounded text-xs font-medium ${reasonClass}">
+                            ${reasonText}
+                        </span>
+                    `;
+                    absentEmployees.appendChild(employeeElement);
+                });
+            }
+            
+            // Показываем модальное окно
+            modal.classList.remove('hidden');
+        }
+        
+        // Функция для открытия модального окна редактирования
+        function openEditModal() {
+            const modal = document.getElementById('edit-modal');
+            const employeeSelect = document.getElementById('employee-select');
+            const shiftDate = document.getElementById('shift-date');
+            
+            // Заполняем выпадающий список сотрудников
+            employeeSelect.innerHTML = '<option value="">Выберите сотрудника</option>';
+            employees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.id;
+                option.textContent = employee.name;
+                employeeSelect.appendChild(option);
+            });
+            
+            // Устанавливаем сегодняшнюю дату по умолчанию
+            const today = new Date();
+            shiftDate.value = today.toISOString().split('T')[0];
+            
+            // Сбрасываем форму
+            document.getElementById('edit-shift-form').reset();
+            document.getElementById('time-fields').classList.add('hidden');
+            document.getElementById('date-range-fields').style.display = 'none';
+            document.getElementById('single-date-field').style.display = 'block';
+            
+            // Показываем модальное окно
+            modal.classList.remove('hidden');
+        }
+        
+        // Функция для сохранения данных в localStorage
+        function saveShiftsData() {
+            localStorage.setItem('shiftsData', JSON.stringify(shiftsData));
+        }
+        
+        // Функция для сохранения заявок в localStorage
+        function saveRequestsData() {
+            localStorage.setItem('shiftRequests', JSON.stringify(requestsData));
+            updateRequestsBadge();
+        }
+        
+        // Функция для получения всех дат в диапазоне
+        function getDatesInRange(startDate, endDate) {
+            const dates = [];
+            const currentDate = new Date(startDate);
+            const end = new Date(endDate);
+            
+            while (currentDate <= end) {
+                dates.push(new Date(currentDate));
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            return dates;
+        }
+        
+        // Функция для обновления бейджа с количеством заявок
+        function updateRequestsBadge() {
+            const badge = document.getElementById('requests-badge');
+            const count = requestsData.length;
+            
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+        
+        // Функция для отображения заявок
+        function renderRequests() {
+            const requestsList = document.getElementById('requests-list');
+            const noRequests = document.getElementById('no-requests');
+            
+            requestsList.innerHTML = '';
+            
+            if (requestsData.length === 0) {
+                noRequests.classList.remove('hidden');
+                return;
+            }
+            
+            noRequests.classList.add('hidden');
+            
+            requestsData.forEach((request, index) => {
+                const employee = employees.find(emp => emp.id === request.employeeId);
+                if (!employee) return;
+                
+                const requestElement = document.createElement('div');
+                requestElement.className = 'request-item bg-white border border-gray-200 rounded-lg p-4';
+                
+                let requestType = '';
+                let requestDetails = '';
+                
+                switch(request.type) {
+                    case 'vacation':
+                        requestType = 'Отпуск';
+                        requestDetails = `Период: ${request.startDate} - ${request.endDate}`;
+                        break;
+                    case 'sick':
+                        requestType = 'Больничный';
+                        requestDetails = `Период: ${request.startDate} - ${request.endDate}`;
+                        break;
+                    case 'dayoff':
+                        requestType = 'Выходной';
+                        requestDetails = `Дата: ${request.date}`;
+                        break;
+                    case 'work':
+                        requestType = 'Рабочий день';
+                        requestDetails = `Дата: ${request.date}, Смена: ${request.shiftType === 'day' ? 'День' : 'Ночь'}`;
+                        break;
+                }
+                
+                requestElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-semibold text-lg">${employee.name}</h4>
+                            <p class="text-gray-600">${requestType}</p>
+                            <p class="text-sm text-gray-500 mt-1">${requestDetails}</p>
+                        </div>
+                        <span class="px-2 py-1 rounded text-xs font-medium ${getRequestTypeClass(request.type)}">
+                            ${requestType}
+                        </span>
+                    </div>
+                    <div class="mb-3">
+                        <p class="text-sm text-gray-700"><span class="font-medium">Причина:</span> ${request.reason}</p>
+                    </div>
+                    <div class="flex justify-end space-x-2">
+                        <button class="reject-request px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-sm" data-index="${index}">
+                            Отклонить
+                        </button>
+                        <button class="approve-request px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition text-sm" data-index="${index}">
+                            Принять
+                        </button>
+                    </div>
+                `;
+                
+                requestsList.appendChild(requestElement);
+            });
+            
+            // Добавляем обработчики для кнопок принятия и отклонения
+            document.querySelectorAll('.approve-request').forEach(button => {
+                button.addEventListener('click', function() {
+                    const index = parseInt(this.getAttribute('data-index'));
+                    approveRequest(index);
+                });
+            });
+            
+            document.querySelectorAll('.reject-request').forEach(button => {
+                button.addEventListener('click', function() {
+                    const index = parseInt(this.getAttribute('data-index'));
+                    rejectRequest(index);
+                });
+            });
+        }
+        
+        // Функция для получения класса для типа заявки
+        function getRequestTypeClass(type) {
+            switch(type) {
+                case 'vacation':
+                    return 'bg-green-100 text-green-800';
+                case 'sick':
+                    return 'bg-orange-100 text-orange-800';
+                case 'dayoff':
+                    return 'bg-blue-100 text-blue-800';
+                case 'work':
+                    return 'bg-yellow-100 text-yellow-800';
+                default:
+                    return 'bg-gray-100 text-gray-800';
+            }
+        }
+        
+        // Функция для принятия заявки
+        function approveRequest(index) {
+            const request = requestsData[index];
+            
+            // Применяем изменения к графику
+            if (request.type === 'vacation' || request.type === 'sick') {
+                // Обработка диапазона дат для отпуска/больничного
+                const datesInRange = getDatesInRange(request.startDate, request.endDate);
+                
+                // Создаем записи для каждой даты в диапазоне
+                datesInRange.forEach(date => {
+                    const dateKey = date.toISOString().split('T')[0];
+                    
+                    // Создаем или обновляем запись о смене
+                    if (!shiftsData[dateKey]) {
+                        shiftsData[dateKey] = [];
+                    }
+                    
+                    // Удаляем существующую запись для этого сотрудника на эту дату
+                    shiftsData[dateKey] = shiftsData[dateKey].filter(shift => shift.employeeId !== request.employeeId);
+                    
+                    // Добавляем новую запись
+                    shiftsData[dateKey].push({
+                        employeeId: request.employeeId,
+                        type: request.type
+                    });
+                });
+            } else {
+                // Обработка одиночной даты для выходных/рабочих дней
+                const date = request.date;
+                
+                // Создаем или обновляем запись о смене
+                if (!shiftsData[date]) {
+                    shiftsData[date] = [];
+                }
+                
+                // Удаляем существующую запись для этого сотрудника на эту дату
+                shiftsData[date] = shiftsData[date].filter(shift => shift.employeeId !== request.employeeId);
+                
+                // Добавляем новую запись
+                const shiftData = {
+                    employeeId: request.employeeId,
+                    type: request.type === 'work' ? request.shiftType : request.type
+                };
+                
+                if (request.type === 'work') {
+                    shiftData.startTime = request.shiftType === 'day' ? '08:00' : '20:00';
+                    shiftData.endTime = request.shiftType === 'day' ? '20:00' : '08:00';
+                }
+                
+                shiftsData[date].push(shiftData);
+            }
+            
+            // Сохраняем изменения графика
+            saveShiftsData();
+            
+            // Удаляем заявку
+            requestsData.splice(index, 1);
+            saveRequestsData();
+            
+            // Обновляем интерфейс
+            renderRequests();
+            renderCalendar(currentDate);
+            
+            alert('Заявка принята и изменения внесены в график!');
+        }
+        
+        // Функция для отклонения заявки
+        function rejectRequest(index) {
+            requestsData.splice(index, 1);
+            saveRequestsData();
+            renderRequests();
+            alert('Заявка отклонена!');
+        }
+        
+        // Функция для открытия модального окна заявок
+        function openRequestsModal() {
+            const modal = document.getElementById('requests-modal');
+            renderRequests();
+            modal.classList.remove('hidden');
+        }
+        
+        // Функция для создания тестовых заявок (для демонстрации)
+        function createSampleRequests() {
+            if (requestsData.length > 0) return;
+            
+            const sampleRequests = [
+                {
+                    employeeId: 1,
+                    type: 'vacation',
+                    startDate: '2023-06-10',
+                    endDate: '2023-06-20',
+                    reason: 'Плановый ежегодный отпуск'
+                },
+                {
+                    employeeId: 3,
+                    type: 'sick',
+                    startDate: '2023-06-05',
+                    endDate: '2023-06-08',
+                    reason: 'ОРВИ, температура'
+                },
+                {
+                    employeeId: 5,
+                    type: 'dayoff',
+                    date: '2023-06-15',
+                    reason: 'Семейные обстоятельства'
+                },
+                {
+                    employeeId: 7,
+                    type: 'work',
+                    date: '2023-06-12',
+                    shiftType: 'night',
+                    reason: 'Хочу поменять смену с дневной на ночную'
+                }
+            ];
+            
+            requestsData = sampleRequests;
+            saveRequestsData();
+        }
+        
+        // Обработчики событий для кнопок навигации
+        document.getElementById('prev-month').addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar(currentDate);
+        });
+        
+        document.getElementById('next-month').addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar(currentDate);
+        });
+        
+        // Обработчик для кнопки редактирования смен
+        document.getElementById('edit-shifts').addEventListener('click', openEditModal);
+        
+        // Обработчик для кнопки заявок
+        document.getElementById('requests-btn').addEventListener('click', openRequestsModal);
+        
+        // Обработчики для закрытия модальных окон
+        document.getElementById('close-modal').addEventListener('click', () => {
+            document.getElementById('day-modal').classList.add('hidden');
+        });
+        
+        document.getElementById('close-edit-modal').addEventListener('click', () => {
+            document.getElementById('edit-modal').classList.add('hidden');
+        });
+        
+        document.getElementById('close-requests-modal').addEventListener('click', () => {
+            document.getElementById('requests-modal').classList.add('hidden');
+        });
+        
+        document.getElementById('cancel-edit').addEventListener('click', () => {
+            document.getElementById('edit-modal').classList.add('hidden');
+        });
+        
+        // Закрытие модальных окон при клике вне их
+        document.getElementById('day-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('day-modal')) {
+                document.getElementById('day-modal').classList.add('hidden');
+            }
+        });
+        
+        document.getElementById('edit-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('edit-modal')) {
+                document.getElementById('edit-modal').classList.add('hidden');
+            }
+        });
+        
+        document.getElementById('requests-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('requests-modal')) {
+                document.getElementById('requests-modal').classList.add('hidden');
+            }
+        });
+        
+        // Обработчик изменения типа смены
+        document.querySelectorAll('input[name="shift-type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const timeFields = document.getElementById('time-fields');
+                const dateRangeFields = document.getElementById('date-range-fields');
+                const singleDateField = document.getElementById('single-date-field');
+                
+                if (this.value === 'day' || this.value === 'night') {
+                    timeFields.classList.remove('hidden');
+                    dateRangeFields.style.display = 'none';
+                    singleDateField.style.display = 'block';
+                } else if (this.value === 'vacation' || this.value === 'sick') {
+                    timeFields.classList.add('hidden');
+                    dateRangeFields.style.display = 'block';
+                    singleDateField.style.display = 'none';
+                    
+                    // Устанавливаем даты по умолчанию для диапазона
+                    const today = new Date();
+                    const endDate = new Date();
+                    endDate.setDate(today.getDate() + 7); // +7 дней от сегодня
+                    
+                    document.getElementById('start-date').value = today.toISOString().split('T')[0];
+                    document.getElementById('end-date').value = endDate.toISOString().split('T')[0];
+                } else {
+                    timeFields.classList.add('hidden');
+                    dateRangeFields.style.display = 'none';
+                    singleDateField.style.display = 'block';
+                }
+            });
+        });
+        
+        // Обработчик отправки формы редактирования
+        document.getElementById('edit-shift-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const employeeId = parseInt(document.getElementById('employee-select').value);
+            const shiftType = document.querySelector('input[name="shift-type"]:checked')?.value;
+            const startTime = document.getElementById('shift-start').value;
+            const endTime = document.getElementById('shift-end').value;
+            
+            if (!employeeId || !shiftType) {
+                alert('Пожалуйста, заполните все обязательные поля');
+                return;
+            }
+            
+            // Обработка в зависимости от типа записи
+            if (shiftType === 'vacation' || shiftType === 'sick') {
+                // Обработка диапазона дат для отпуска/больничного
+                const startDate = document.getElementById('start-date').value;
+                const endDate = document.getElementById('end-date').value;
+                
+                if (!startDate || !endDate) {
+                    alert('Пожалуйста, укажите период отсутствия');
+                    return;
+                }
+                
+                if (new Date(startDate) > new Date(endDate)) {
+                    alert('Дата начала не может быть позже даты окончания');
+                    return;
+                }
+                
+                // Получаем все даты в диапазоне
+                const datesInRange = getDatesInRange(startDate, endDate);
+                
+                // Создаем записи для каждой даты в диапазоне
+                datesInRange.forEach(date => {
+                    const dateKey = date.toISOString().split('T')[0];
+                    
+                    // Создаем или обновляем запись о смене
+                    if (!shiftsData[dateKey]) {
+                        shiftsData[dateKey] = [];
+                    }
+                    
+                    // Удаляем существующую запись для этого сотрудника на эту дату
+                    shiftsData[dateKey] = shiftsData[dateKey].filter(shift => shift.employeeId !== employeeId);
+                    
+                    // Добавляем новую запись
+                    shiftsData[dateKey].push({
+                        employeeId: employeeId,
+                        type: shiftType
+                    });
+                });
+                
+            } else {
+                // Обработка одиночной даты для смен/выходных/прогулов
+                const date = document.getElementById('shift-date').value;
+                
+                if (!date) {
+                    alert('Пожалуйста, укажите дату');
+                    return;
+                }
+                
+                // Создаем или обновляем запись о смене
+                if (!shiftsData[date]) {
+                    shiftsData[date] = [];
+                }
+                
+                // Удаляем существующую запись для этого сотрудника на эту дату
+                shiftsData[date] = shiftsData[date].filter(shift => shift.employeeId !== employeeId);
+                
+                // Добавляем новую запись
+                const shiftData = {
+                    employeeId: employeeId,
+                    type: shiftType
+                };
+                
+                if (shiftType === 'day' || shiftType === 'night') {
+                    shiftData.startTime = startTime;
+                    shiftData.endTime = endTime;
+                }
+                
+                shiftsData[date].push(shiftData);
+            }
+            
+            // Сохраняем данные
+            saveShiftsData();
+            
+            // Обновляем календарь
+            renderCalendar(currentDate);
+            
+            // Закрываем модальное окно
+            document.getElementById('edit-modal').classList.add('hidden');
+            
+            alert('Данные успешно сохранены!');
+        });
+        
+        // Инициализация календаря и создание тестовых данных
+        renderCalendar(currentDate);
+        createSampleRequests();
+        updateRequestsBadge();
+    </script>
+</body>
+</html>
